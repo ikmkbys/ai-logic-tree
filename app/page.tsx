@@ -132,6 +132,13 @@ export default function HomePage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push("/help")}
+              className="w-8 h-8 flex items-center justify-center rounded-full border border-ink-faint text-ink-muted hover:bg-paper-dark hover:text-ink transition text-sm font-semibold"
+              title="使い方"
+            >
+              ?
+            </button>
             <input
               ref={importRef}
               type="file"
