@@ -84,7 +84,7 @@ export default function TreeNode({
         width: NODE_W,
         height: NODE_H,
       }}
-      className="group"
+      className="group hover:z-10"
       onClick={(e) => {
         e.stopPropagation();
         onClick();
