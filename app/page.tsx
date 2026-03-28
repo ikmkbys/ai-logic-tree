@@ -1,17 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, TreePine, Trash2, ChevronRight } from "lucide-react";
-import { Tree } from "@/lib/types";
-import { loadTrees, createTree, deleteTree } from "@/lib/storage";
+import { Plus, TreePine, Trash2, ChevronRight, Upload } from "lucide-react";
+import { Tree, TreeNode } from "@/lib/types";
+import { loadTrees, createTree, deleteTree, saveTree } from "@/lib/storage";
+import { v4 as uuidv4 } from "uuid";
+
+function parseCSVRow(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuote) {
+      if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }  // エスケープ済みダブルクォート
+      else if (ch === '"') { inQuote = false; }
+      else { current += ch; }
+    } else {
+      if (ch === '"') { inQuote = true; }
+      else if (ch === ',') { result.push(current); current = ""; }
+      else { current += ch; }
+    }
+  }
+  result.push(current);
+  return result;
+}
 
 export default function HomePage() {
   const router = useRouter();
   const [trees, setTrees] = useState<Tree[]>([]);
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setTrees(loadTrees());
@@ -30,6 +52,61 @@ export default function HomePage() {
     if (!confirm("このツリーを削除しますか？")) return;
     deleteTree(id);
     setTrees((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  function handleImportCsv(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";  // 同じファイルを再選択できるようリセット
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = (ev.target?.result as string).replace(/^\uFEFF/, "");  // BOM除去
+        const lines = text.trim().split(/\r?\n/);
+        if (lines.length < 2) throw new Error("データが空です");
+
+        const nodes: Record<string, TreeNode> = {};
+        let rootId = "";
+
+        for (let i = 1; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          const [id, title, parentId, isAiGenerated] = parseCSVRow(lines[i]);
+          if (!id || !title) continue;
+          nodes[id] = {
+            id,
+            title,
+            children: [],
+            parentId: parentId || null,
+            isAiGenerated: isAiGenerated === "true",
+            createdAt: Date.now(),
+          };
+          if (!parentId) rootId = id;
+        }
+
+        if (!rootId || !nodes[rootId]) throw new Error("ルートノードが見つかりません");
+
+        // childrenを再構築
+        for (const node of Object.values(nodes)) {
+          if (node.parentId && nodes[node.parentId]) {
+            nodes[node.parentId].children.push(node.id);
+          }
+        }
+
+        const tree: Tree = {
+          id: uuidv4(),
+          title: nodes[rootId].title,
+          rootId,
+          nodes,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        saveTree(tree);
+        router.push(`/tree/${tree.id}`);
+      } catch (err) {
+        alert(`インポートに失敗しました: ${err instanceof Error ? err.message : "CSVの形式を確認してください"}`);
+      }
+    };
+    reader.readAsText(file);
   }
 
   function nodeCount(tree: Tree) {
@@ -54,13 +131,29 @@ export default function HomePage() {
               AI Logic Tree
             </span>
           </div>
-          <button
-            onClick={() => setCreating(true)}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-ink text-paper text-sm font-medium rounded-full hover:bg-ink-soft transition-colors"
-          >
-            <Plus size={14} />
-            新規ツリー
-          </button>
+          <div className="flex items-center gap-2">
+            <input
+              ref={importRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={handleImportCsv}
+            />
+            <button
+              onClick={() => importRef.current?.click()}
+              className="flex items-center gap-1.5 px-4 py-1.5 border border-ink-faint text-ink text-sm font-medium rounded-full hover:bg-paper-dark transition-colors"
+            >
+              <Upload size={14} />
+              インポート
+            </button>
+            <button
+              onClick={() => setCreating(true)}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-ink text-paper text-sm font-medium rounded-full hover:bg-ink-soft transition-colors"
+            >
+              <Plus size={14} />
+              新規ツリー
+            </button>
+          </div>
         </div>
       </header>
 

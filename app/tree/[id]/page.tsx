@@ -11,6 +11,7 @@ import {
   TreePine,
   Pencil,
   Check,
+  FileDown,
 } from "lucide-react";
 import { Tree } from "@/lib/types";
 import { loadTree, saveTree } from "@/lib/storage";
@@ -42,6 +43,28 @@ export default function TreePage() {
     setTree(updated);
     saveTree(updated);
     setEditingTitle(false);
+  }
+
+  function handleExportCsv() {
+    if (!tree) return;
+    const rows: string[][] = [["id", "title", "parentId", "isAiGenerated"]];
+    for (const node of Object.values(tree.nodes)) {
+      rows.push([
+        node.id,
+        node.title,
+        node.parentId ?? "",
+        String(node.isAiGenerated ?? false),
+      ]);
+    }
+    const csv = rows
+      .map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }); // BOM付きでExcel対応
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `logic_tree_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
   async function handleExport() {
@@ -136,7 +159,16 @@ export default function TreePage() {
 
         <div className="w-px h-5 bg-ink-faint mx-1 hidden sm:block" />
 
-        {/* Export */}
+        {/* Export CSV */}
+        <button
+          onClick={handleExportCsv}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-paper border border-ink-faint text-ink text-xs font-medium rounded-full hover:bg-paper-dark transition"
+        >
+          <FileDown size={12} />
+          CSV
+        </button>
+
+        {/* Export PNG */}
         <button
           onClick={handleExport}
           disabled={exporting}
