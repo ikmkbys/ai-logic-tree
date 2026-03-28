@@ -149,7 +149,7 @@ export default function TreeNode({
       {/* Action buttons — appear on hover/select */}
       <div
         className={cn(
-          "absolute -bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-1 transition-all duration-150",
+          "absolute bottom-1 right-2 flex items-center gap-1 transition-all duration-150",
           "opacity-0 group-hover:opacity-100",
           isSelected && "opacity-100"
         )}
